@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-green-900: #0b3d23;
+  --color-green-700: #1b7a45;
+  --color-green-600: #22924f;
+  --color-green-500: #2aa85c;
+  --color-green-100: #e8f5ee;
+  --color-green-50: #f0faf4;
+  --color-gold-600: #c8a13a;
+  --color-gold-400: #fdd835;
+  --color-gold-100: #fef9e7;
+  --color-car-a: #4caf50;
+  --color-car-b: #ff9800;
+  --color-car-c: #f44336;
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+:root {
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --primary: #1b7a45;
+  --primary-dark: #0b3d23;
+  --gold: #c8a13a;
+  --radius: 10px;
+  
+  --catA: #4caf50;
+  --catB: #ff9800;
+  --catC: #f44336;
+  
+  /* Anciennes variables requises pour certains composants legacy (si besoin temporairement) */
+  --ink:#1f2a24; --muted:#5f6e65; --line:#dde4de; --panel:#ffffff;
+  --brand:#0e4d2c; --brand2:#136b3d; --navbg:#0d3a22; --navink:#cfe0d4; --accent:#c8a13a;
+  --ok:#2e7d32; --warn:#b26a00; --err:#b71c1c; --info:#0d47a1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Hide scrollbar by default, show on hover */
+.scroll-area { overflow-y: auto; }
+.scroll-area:not(:hover)::-webkit-scrollbar-thumb { background: transparent; }
+
+/* Transitions */
+.transition-base { transition: all 0.18s ease; }
+
+
+/* ============================================================ */
+/* STYLES HÉRITÉS DE LEAFLET ET DE LA CARTE                     */
+/* ============================================================ */
+
+/* Carte SVG */
+svg#map{width:100%;height:100%;display:block;cursor:grab;}
+svg#map.measuring{cursor:crosshair;}
+.parc{stroke:#ffffffcc;stroke-width:.8;cursor:pointer;}
+.parc:hover{filter:brightness(1.12);stroke:#fff;stroke-width:1.4;}
+.parc.sel{stroke:#e53935;stroke-width:2.2;}
+.parc.hit{stroke:#7b1fa2;stroke-width:2;stroke-dasharray:4 2;}
+.coordbar{position:absolute;left:0;right:0;bottom:0;background:#ffffffe8;border-top:1px solid var(--line);font-size:11px;padding:4px 12px;display:flex;gap:16px;color:var(--muted);}
+.legend{position:absolute;right:12px;bottom:34px;background:#ffffffef;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:11px;box-shadow:0 2px 8px #0002;max-width:200px;}
+.legend h4{font-size:10.5px;margin-bottom:6px;color:var(--brand);text-transform:uppercase;letter-spacing:.4px;}
+.legend .li{display:flex;align-items:center;gap:7px;margin:3px 0;}
+.legend .sw{width:14px;height:10px;border:1px solid #0003;border-radius:2px;flex-shrink:0;}
+.maptools{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:5px;}
+.maptools button{width:32px;height:32px;border:1px solid var(--line);background:#fff;border-radius:7px;cursor:pointer;font-size:14px;box-shadow:0 1px 4px #0002;}
+.maptools button.active{background:var(--brand);color:#fff;}
+.simbanner{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#7b1fa2;color:#fff;font-size:11px;font-weight:700;padding:5px 14px;border-radius:14px;box-shadow:0 2px 8px #0003;display:none;}
+.parcCard{position:absolute;top:10px;right:12px;width:250px;background:#fffffff6;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 14px #0003;padding:11px 13px;display:none;font-size:11.5px;}
+.parcCard h4{font-size:12px;color:var(--brand);margin-bottom:6px;}
+.parcCard .row{display:flex;justify-content:space-between;margin:2px 0;}
+.parcCard .row span:first-child{color:var(--muted);}
+.cat-tooltip { background: transparent; border: none; box-shadow: none; font-size: 11px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8), 1px -1px 2px rgba(0,0,0,0.8), -1px 1px 2px rgba(0,0,0,0.8); }
+
+/* Arbre de couches */
+.laygrp{margin-bottom:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+.laygrp>summary{background:#eef3ef;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;list-style:none;color:var(--brand);}
+.laygrp>summary::-webkit-details-marker{display:none;}
+.lay{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:11.5px;border-top:1px solid #eef2ee;}
+.lay.sub{padding-left:30px;background:#fbfdfb;}
+.lay .sw{width:13px;height:13px;border-radius:3px;border:1px solid #0002;flex-shrink:0;}
+.lay input[type=range]{width:46px;margin-left:auto;}
+
+/* Encadrés pour carte */
+.note{background:#fff8e1;border:1px solid #f0e0a0;border-radius:8px;padding:8px 11px;font-size:11.5px;color:#6b5b10;margin:10px 0;line-height:1.45;}
+.note.sim{background:#f3e5f5;border-color:#d7b6de;color:#5e2a6b;}
+.note.okn{background:#e9f4ea;border-color:#bcd9bf;color:#1d4b21;}
+.toast{position:fixed;top:60px;right:16px;background:#123c26;color:#fff;padding:10px 14px;border-radius:8px;font-size:12.5px;box-shadow:0 4px 14px #0005;opacity:0;transform:translateY(-8px);transition:all .25s;z-index:60;max-width:360px;pointer-events:none;}
+.toast.show{opacity:1;transform:none;}
+
+
+/* ============================================================ */
+/* Modal d'import de couches                                    */
+/* ============================================================ */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadeIn 0.2s ease-out;}
+.modal-content{background:var(--panel);border-radius:14px;box-shadow:0 16px 60px rgba(0,0,0,0.35);width:560px;max-height:85vh;overflow-y:auto;animation:fadeIn 0.3s ease-out;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--line);}
+.modal-header h2{font-size:17px;color:var(--brand);margin:0;}
+.modal-body{padding:20px 24px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line);}
+.import-steps{display:flex;align-items:center;justify-content:center;gap:0;padding:16px 24px;background:var(--bg);}
+.import-step{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.import-step.active{color:var(--brand);font-weight:700;}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.import-step.active .step-num{background:var(--brand);color:#fff;}
+.step-line{width:40px;height:2px;background:var(--line);margin:0 6px;}
+.drop-zone{border:2px dashed var(--line);border-radius:12px;padding:36px 24px;text-align:center;cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--brand);background:rgba(14,77,44,0.04);}
+.drop-zone.has-file{border-color:var(--ok);background:rgba(46,125,50,0.06);}
+.drop-icon{font-size:36px;}
+.drop-main{font-size:14px;font-weight:600;color:var(--ink);}
+.drop-hint{font-size:11px;color:var(--muted);}
+.drop-filename{font-size:14px;font-weight:700;color:var(--brand);}
+.drop-size{font-size:11px;color:var(--muted);}
+.drop-formats{font-size:10.5px;color:var(--muted);margin-top:6px;padding:6px 12px;background:var(--bg);border-radius:6px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group.full{grid-column:1/-1;}
+.form-group label{font-size:12px;font-weight:600;color:var(--ink);}
+.form-group .req{color:var(--err);}
+.form-group input,.form-group select,.form-group textarea{border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;transition:border-color 0.2s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,77,44,0.1);}
+.form-group small{font-size:10.5px;color:var(--muted);}
+.import-info{display:flex;gap:10px;align-items:flex-start;background:rgba(13,71,161,0.06);border:1px solid rgba(13,71,161,0.15);border-radius:8px;padding:12px;margin-top:16px;font-size:12px;color:var(--ink);line-height:1.5;}
+.info-icon{font-size:18px;flex-shrink:0;}
+.import-result{text-align:center;padding:20px 0;}
+.import-result.success{color:var(--ok);}
+.result-icon{font-size:48px;display:block;margin-bottom:10px;}
+.import-result h3{font-size:16px;margin-bottom:16px;color:var(--ink);}
+.result-details{background:var(--bg);border-radius:10px;padding:16px;text-align:left;}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);}
+.result-row:last-child{border-bottom:none;}
+.result-warnings{margin-top:16px;background:rgba(178,106,0,0.08);border:1px solid rgba(178,106,0,0.2);border-radius:8px;padding:12px;text-align:left;font-size:11px;}
+.result-warnings ul{margin:6px 0 0 16px;}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================ */
+/* Modal de détail de couche (CoucheDetailModal)                */
+/* ============================================================ */
+.couche-name-link { cursor: pointer; color: var(--brand); transition: all 0.2s; border-bottom: 1px dashed transparent; }
+.couche-name-link:hover { color: var(--brand2); border-bottom-color: var(--brand2); }
+.couche-detail-modal { width: 720px; max-width: 92vw; }
+.couche-detail-subtitle { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.couche-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); padding: 0 24px; background: var(--bg); }
+.couche-tab { padding: 10px 16px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.couche-tab:hover { color: var(--ink); background: #ffffff66; }
+.couche-tab.active { color: var(--brand); border-bottom-color: var(--brand); background: #fff; }
+.couche-detail-body { min-height: 320px; max-height: 60vh; overflow-y: auto; }
+.couche-tab-content { animation: fadeIn 0.2s ease-out; }
+.info-grid, .meta-grid { display: flex; flex-direction: column; gap: 0; }
+.info-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f0f3f0; font-size: 12.5px; gap: 12px; }
+.info-row:last-child { border-bottom: none; }
+.info-label { flex: 0 0 180px; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.info-value { flex: 1; color: var(--ink); word-break: break-word; }
+.couche-version-count { color: var(--brand); cursor: pointer; font-weight: 700; border-bottom: 1px dashed var(--brand); transition: opacity 0.2s; }
+.couche-version-count:hover { opacity: 0.7; }
+.version-timeline { position: relative; padding: 4px 0 4px 28px; }
+.version-item { position: relative; padding: 0 0 20px 0; }
+.version-item:last-child { padding-bottom: 0; }
+.version-dot { position: absolute; left: -28px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--line); border: 2px solid #fff; box-shadow: 0 0 0 2px var(--line); z-index: 2; transition: all 0.2s; }
+.version-item.latest .version-dot { background: var(--brand); box-shadow: 0 0 0 2px var(--brand), 0 0 0 5px rgba(14,77,44,0.15); }
+.version-item:hover .version-dot { transform: scale(1.2); }
+.version-line { position: absolute; left: -23px; top: 16px; bottom: -4px; width: 2px; background: var(--line); z-index: 1; }
+.version-item:last-child .version-line { display: none; }
+.version-content { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; transition: all 0.2s; }
+.version-item.latest .version-content { border-color: #a7f3d0; background: #f0fdf4; }
+.version-item:hover .version-content { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.version-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.version-number { font-weight: 800; font-size: 13px; color: var(--brand); background: #e8f5e9; padding: 2px 8px; border-radius: 6px; }
+.version-item.latest .version-number { background: var(--brand); color: #fff; }
+.version-date { font-size: 11px; color: var(--muted); }
+.version-author { font-size: 11px; color: var(--muted); font-style: italic; }
+.version-desc { font-size: 12px; color: var(--ink); line-height: 1.5; margin-bottom: 6px; }
+.version-statut-change { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.version-arrow { color: var(--muted); font-weight: 700; }
+.pill.sm { font-size: 9.5px; padding: 1px 7px; }
+.champs-count { font-size: 12px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+.champs-table .geom-row td { background: #e3f2fd08; }
+.champ-name { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; color: var(--brand); }
+.champ-type { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace; font-size: 11px; color: #64748b; }
+.couche-loading { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+.couche-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+.couche-empty-icon { font-size: 40px; margin-bottom: 10px; }
+.couche-empty p { font-size: 13px; margin-bottom: 4px; }
+.couche-empty small { font-size: 11px; opacity: 0.8; }
+.info-edit-form, .meta-edit-form { animation: fadeIn 0.2s ease-out; }
+.info-edit-form .form-grid, .meta-edit-form .form-grid { gap: 12px; }
+
+/* ============================================================ */
+/* M1-07 : Measure tools tooltip                               */
+/* ============================================================ */
+.measure-tooltip {
+  background: rgba(0, 0, 0, 0.75) !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+}
+.measure-tooltip::before {
+  border-top-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }

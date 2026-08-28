@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  geoportail-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geoportail-app-container
+    ports:
+      # Expose l'application sur le port 8080 de votre machine, qui redirige vers le port 80 du conteneur (Nginx)
+      - "8080:80"
+    restart: unless-stopped
