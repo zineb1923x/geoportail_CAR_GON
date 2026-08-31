@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -24,11 +25,19 @@ class ClasseCViewSet(viewsets.ModelViewSet):
 from django.db.models import Q
 from django.db.models.functions import Round
 
+from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
+
 class UniteCarteAgricoleViewSet(viewsets.ModelViewSet):
     queryset = UniteCarteAgricole.objects.all()
     serializer_class = UniteCarteAgricoleSerializer
     permission_classes = [IsAuthenticated, IsEditeurOrAdmin]
 
+    @extend_schema(
+        summary="Requêtes spatiales multicritères",
+        description="Filtre les Unités de Carte Agricole selon plusieurs critères (ex: Catégorie, Commune, Superficie).",
+        request=UniteCarteAgricoleSerializer,
+        responses={200: UniteCarteAgricoleSerializer(many=True)}
+    )
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def requetes(self, request):
         """
@@ -150,7 +159,7 @@ class RegleClassementViewSet(viewsets.ModelViewSet):
 class ScenarioAMCViewSet(viewsets.ModelViewSet):
     queryset = ScenarioAMC.objects.all()
     serializer_class = ScenarioAMCSerializer
-    permission_classes = [IsAuthenticated, IsEditeurOrAdmin]
+    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def criteres(self, request):
@@ -168,26 +177,53 @@ class ScenarioAMCViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def simuler(self, request):
         """
-        Simule le classement AMC sans sauvegarder en base.
-        Attend un payload JSON avec 'poids' et 'seuils'.
+        Simule le classement AMC. Crée un scénario temporaire et lance la tâche Celery.
         """
         poids = request.data.get('poids', {})
         seuils = request.data.get('seuils', {})
+        matrice = request.data.get('matrice_comparaison', None)
+        moteur = request.data.get('moteur', 'ponderation')
         
-        seuil_a = seuils.get('A', 70)
-        seuil_b = seuils.get('B', 45)
+        # Création d'un scénario temporaire de simulation
+        scenario = ScenarioAMC.objects.create(
+            nom=f"Simulation_{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            moteur_scoring=moteur,
+            poids=poids,
+            seuils=seuils,
+            matrice_comparaison=matrice,
+            est_car_validee=False,
+            auteur=request.user if request.user.is_authenticated else None
+        )
+        
+        # Lancement de la tâche asynchrone
+        from classement.tasks import calculer_scenario_amc_task
+        task = calculer_scenario_amc_task.delay(scenario.id)
+        
+        return Response({
+            'scenario_id': scenario.id,
+            'task_id': task.id,
+            'status': 'PENDING'
+        }, status=status.HTTP_202_ACCEPTED)
 
-        # Simulation: dans une vraie intégration, on ferait une requête PostGIS
-        # sur UniteCarteAgricole pour calculer l'IPA et renvoyer les stats réelles.
-        # Ici, on renvoie un résultat simulé pour l'API.
+    @action(detail=False, methods=['get'], url_path='task_status/(?P<task_id>[^/.]+)', permission_classes=[AllowAny])
+    def task_status(self, request, task_id=None):
+        """
+        Vérifie le statut de la tâche de simulation Celery.
+        """
+        from celery.result import AsyncResult
+        task = AsyncResult(task_id)
         
-        resultat = {
-            'summary': 'A 4500.0 ha · B 2100.0 ha · C 1200.0 ha',
-            'by': { 'A': 4500.0, 'B': 2100.0, 'C': 1200.0 },
-            'chg': [
-                {'id': 'UCA-001', 'from': 'B', 'to': 'A', 'ipa': 75.5},
-                {'id': 'UCA-002', 'from': 'C', 'to': 'B', 'ipa': 48.2}
-            ]
-        }
-        
-        return Response(resultat, status=status.HTTP_200_OK)
+        if task.state == 'PENDING':
+            response = {'state': task.state, 'status': 'En attente...'}
+        elif task.state != 'FAILURE':
+            response = {
+                'state': task.state,
+                'result': task.result # Contient le summary et les changements
+            }
+        else:
+            response = {
+                'state': task.state,
+                'error': str(task.info)
+            }
+            
+        return Response(response)

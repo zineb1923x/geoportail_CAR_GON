@@ -93,7 +93,12 @@ class Command(BaseCommand):
                     scenario=scenario,
                     commune=com,
                     geom=geom_final,
-                    est_car_validee=True
+                    est_car_validee=True,
+                    score_eau=random.uniform(0.1, 1.0),
+                    score_sol=random.uniform(0.1, 1.0),
+                    score_clim=random.uniform(0.1, 1.0),
+                    score_occ=random.uniform(0.1, 1.0),
+                    score_cont=random.uniform(0.1, 1.0)
                 )
                 
                 # Create ClasseA/B/C pour la cartographie

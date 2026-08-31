@@ -53,7 +53,7 @@ export default function Restitution() {
         period: period,
         format: format
       });
-      const res = await fetch(`http://localhost:8000/api/geodata/export/?${qs.toString()}`);
+      const res = await fetch(`/api/geodata/export/?${qs.toString()}`);
       
       if (res.ok) {
         if (format.startsWith('pdf') || format === 'csv') {

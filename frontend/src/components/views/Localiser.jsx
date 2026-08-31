@@ -53,7 +53,7 @@ export default function Localiser() {
       }
       
       try {
-        const res = await fetch(`http://localhost:8000/api/geodata/localiser/coordonnees/?lat=${lat}&lng=${lng}`);
+        const res = await fetch(`/api/geodata/localiser/coordonnees/?lat=${lat}&lng=${lng}`);
         const data = await res.json();
         setLocalizedFeature({ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { label: `Coordonnées ${type}` } });
         setResultHtml(`📍 Repère positionné (WGS84: ${data.wgs84.lat.toFixed(5)}°, ${data.wgs84.lng.toFixed(5)}°). Lambert: X=${data.lambert.x.toFixed(2)}, Y=${data.lambert.y.toFixed(2)}`);
@@ -68,7 +68,7 @@ export default function Localiser() {
       if (q.length < 2) { toast('Saisissez un titre foncier valide.'); return; }
       
       try {
-        const res = await fetch(`http://localhost:8000/api/geodata/localiser/titre-foncier/?tf=${encodeURIComponent(tfStr)}`);
+        const res = await fetch(`/api/geodata/localiser/titre-foncier/?tf=${encodeURIComponent(tfStr)}`);
         if (!res.ok) throw new Error('Not found');
         const data = await res.json();
         
@@ -86,7 +86,7 @@ export default function Localiser() {
       if (!comSelect) { toast('Veuillez sélectionner une commune.'); return; }
       
       try {
-        const res = await fetch(`http://localhost:8000/api/geodata/localiser/commune/?nom=${encodeURIComponent(comSelect)}`);
+        const res = await fetch(`/api/geodata/localiser/commune/?nom=${encodeURIComponent(comSelect)}`);
         const data = await res.json();
         setLocalizedFeature(data.geojson);
         setResultHtml(`✅ Commune de ${data.nom} localisée.`);
@@ -113,7 +113,7 @@ export default function Localiser() {
       formData.append('file', uploadFile);
 
       try {
-        const res = await fetch('http://localhost:8000/api/geodata/localiser/fichier/', {
+        const res = await fetch('/api/geodata/localiser/fichier/', {
           method: 'POST',
           body: formData
         });

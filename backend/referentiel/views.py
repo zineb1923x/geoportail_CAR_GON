@@ -191,7 +191,18 @@ class CoucheCatalogueViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def geojson(self, request, pk=None):
         couche = self.get_object()
-        table_name = couche.nom_technique
+        
+        # Mapping thematique to actual django table names
+        THEMATIQUE_TO_TABLE = {
+            'car_a': 'classement_classe_a',
+            'car_b': 'classement_classe_b',
+            'car_c': 'classement_classe_c',
+            'communes': 'administration_commune',
+            'provinces': 'administration_province',
+        }
+        
+        table_name = couche.table_django or THEMATIQUE_TO_TABLE.get(couche.thematique) or couche.nom_technique
+        
         if not table_name:
             return Response({"type": "FeatureCollection", "features": []})
         

@@ -3,6 +3,7 @@ import { Plus, Trash2, Calculator, CheckCircle, AlertTriangle, Info, BarChart2, 
 import { Card, Button, Input, Stepper, SectionHeader, CARBadge } from '../ui/ui';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
 import { useApp } from '../../context/AppContext';
+import AhpMatrix from './AhpMatrix';
 
 const STEPS = ['Critères', 'Pondération AHP', 'Seuils CAR', 'Calcul & Résultats'];
 
@@ -16,73 +17,168 @@ function ahpConsistency(weights) {
 }
 
 export default function AmcAhp() {
-  const { toast, doExport, store, setStore, simActive, setSimActive, setMapContainer } = useApp();
+  const { toast, doExport, store, setStore, simActive, setSimActive, amcResult, setAmcResult, setMapContainer } = useApp();
   
   const [step, setStep] = useState(0);
   const [apiCrit, setApiCrit] = useState([]);
   const [weights, setWeights] = useState({});
+  const [ahpMatrix, setAhpMatrix] = useState([]);
+  const [mode, setMode] = useState('ponderation'); // 'ponderation' ou 'ahp'
+  const [ahpResult, setAhpResult] = useState({ weights: [], cr: 0.0, is_consistent: true });
+  
   const [thA, setThA] = useState(65);
   const [thB, setThB] = useState(40);
   const [loading, setLoading] = useState(false);
-  const [amcResult, setAmcResult] = useState(null);
+  const [currentScenarioId, setCurrentScenarioId] = useState(null);
   const [amcName, setAmcName] = useState('');
+  const [pollingTaskId, setPollingTaskId] = useState(null);
 
   // Fetch criteria from API
   useEffect(() => {
-    fetch('http://localhost:8000/api/classement/scenarioamc/criteres/')
+    fetch('/api/classement/scenarioamc/criteres/')
       .then(res => { if (!res.ok) throw new Error(); return res.json(); })
       .then(data => {
         if (Array.isArray(data)) {
           setApiCrit(data);
           const init = {};
-          data.forEach(c => { init[c.id] = c.defaultWeight / 100; }); // Conversion en ratio 0-1
+          const n = data.length;
+          data.forEach(c => { init[c.id] = c.defaultWeight / 100; });
           setWeights(init);
+          // Initialiser matrice AHP (n x n avec des 1)
+          const mat = Array(n).fill(0).map(() => Array(n).fill(1));
+          setAhpMatrix(mat);
         }
       })
       .catch(() => toast("Impossible de charger les critères."));
   }, [toast]);
 
+  // Helper : calculer AHP en front (approximation pour affichage temps réel)
+  useEffect(() => {
+    if (mode === 'ahp' && ahpMatrix.length > 0) {
+      const n = ahpMatrix.length;
+      let geoMeans = ahpMatrix.map(row => Math.pow(row.reduce((a,b)=>a*b,1), 1/n));
+      let sumG = geoMeans.reduce((a,b)=>a+b, 0);
+      let w = geoMeans.map(g => g / sumG);
+      
+      let lambdaMax = 0;
+      for (let j=0; j<n; j++) {
+        let colSum = ahpMatrix.reduce((sum, row) => sum + row[j], 0);
+        lambdaMax += colSum * w[j];
+      }
+      let ci = (lambdaMax - n) / (n - 1 || 1);
+      const RI_TABLE = {1:0, 2:0, 3:0.58, 4:0.90, 5:1.12, 6:1.24, 7:1.32, 8:1.41};
+      let ri = RI_TABLE[n] || 1.45;
+      let cr = ri === 0 ? 0 : ci / ri;
+      
+      setAhpResult({ weights: w, cr: cr.toFixed(3), is_consistent: cr < 0.10 });
+      
+      // Update display weights
+      const newW = {};
+      apiCrit.forEach((c, i) => { newW[c.id] = w[i]; });
+      setWeights(newW);
+    }
+  }, [ahpMatrix, mode, apiCrit]);
+
   const totalWeight = Object.values(weights).reduce((s, w) => s + w, 0);
-  const cr = ahpConsistency(Object.values(weights));
-  const crOk = parseFloat(cr) < 0.1;
+  const cr = mode === 'ahp' ? ahpResult.cr : 0;
+  const crOk = mode === 'ahp' ? ahpResult.is_consistent : true;
+
+  // Polling task
+  useEffect(() => {
+    let interval;
+    if (pollingTaskId) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/classement/scenarioamc/task_status/${pollingTaskId}/`);
+          const data = await res.json();
+          if (data.state === 'SUCCESS') {
+            if (data.result?.status === 'error') {
+               clearInterval(interval);
+               setPollingTaskId(null);
+               toast(`❌ Erreur: ${data.result.message}`);
+               setLoading(false);
+            } else {
+               clearInterval(interval);
+               setPollingTaskId(null);
+               setSimActive(true);
+               setAmcResult({ 
+                 by: data.result?.stats || {}, 
+                 chg: data.result?.changements || [],
+                 top_units: data.result?.top_units || [],
+                 summary: data.result?.summary || 'Calcul terminé' 
+               });
+               setCurrentScenarioId(data.result?.scenario_id);
+               setStep(3);
+               toast('✅ Simulation terminée !');
+               setLoading(false);
+            }
+          } else if (data.state === 'FAILURE' || data.state === 'error') {
+             clearInterval(interval);
+             setPollingTaskId(null);
+             toast('Erreur lors du calcul asynchrone.');
+             setLoading(false);
+          }
+        } catch (e) {
+          // ignore network errors on poll
+        }
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [pollingTaskId, toast, setSimActive]);
 
   const applyAMC = useCallback(async () => {
     if (thB >= thA) { toast('❌ Le seuil B doit être inférieur au seuil A.'); return; }
+    if (mode === 'ahp' && !crOk) { toast('❌ La matrice AHP est incohérente (CR ≥ 0.10).'); return; }
+    
     setLoading(true);
     try {
-      // Conversion ratio (0-1) -> pourcentages (0-100) attendus par l'API existante
-      const apiWeights = {};
-      Object.keys(weights).forEach(k => apiWeights[k] = Math.round(weights[k] * 100));
+      const payload = {
+         moteur: mode,
+         seuils: { A: thA, B: thB }
+      };
+      
+      if (mode === 'ahp') {
+          payload.matrice_comparaison = ahpMatrix;
+      } else {
+          const apiWeights = {};
+          Object.keys(weights).forEach(k => apiWeights[k] = weights[k]); // en ratio 0-1
+          payload.poids = apiWeights;
+      }
 
-      const response = await fetch('http://localhost:8000/api/classement/scenarioamc/simuler/', {
+      const response = await fetch('/api/classement/scenarioamc/simuler/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poids: apiWeights, seuils: { A: thA, B: thB } })
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
-      setSimActive(true);
-      setAmcResult({ by: data.by, chg: data.chg, summary: data.summary, simulatedParcels: data.chg }); // Supposant que chg contient les parcels reclassées avec score
-      setStep(3);
-      toast('✅ Simulation terminée !');
+      
+      if (data.task_id) {
+          setPollingTaskId(data.task_id);
+          toast('⏳ Simulation lancée en arrière-plan...');
+      } else {
+          // Fallback (ex: simulation directe sans Celery)
+          setSimActive(true);
+          setAmcResult({ by: data.by, chg: data.chg, summary: data.summary });
+          setCurrentScenarioId(data.scenario_id);
+          setStep(3);
+          toast('✅ Simulation terminée !');
+          setLoading(false);
+      }
     } catch {
-      toast('Erreur lors de la simulation.');
-    } finally {
+      toast('Erreur lors du lancement de la simulation.');
       setLoading(false);
     }
-  }, [weights, thA, thB, setSimActive, toast]);
+  }, [weights, thA, thB, mode, ahpMatrix, crOk, setSimActive, toast]);
 
   const saveAmcModel = async () => {
     const n = amcName.trim();
     if (!n) { toast('❌ Donnez un nom à votre scénario.'); return; }
-    if (!amcResult) { toast("❌ Lancez d'abord la simulation."); return; }
+    if (!amcResult || !currentScenarioId) { toast("❌ Lancez d'abord la simulation."); return; }
     try {
-      const apiWeights = {};
-      Object.keys(weights).forEach(k => apiWeights[k] = Math.round(weights[k] * 100));
-
-      const response = await fetch('http://localhost:8000/api/classement/scenarioamc/', {
-        method: 'POST',
+      const response = await fetch(`/api/classement/scenarioamc/${currentScenarioId}/`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nom: n, moteur_scoring: 'ponderation', poids: apiWeights, seuils: { A: thA, B: thB }, est_car_validee: false, auteur: null })
+        body: JSON.stringify({ nom: n })
       });
       if (response.ok) {
         setStore(prev => ({
@@ -105,31 +201,26 @@ export default function AmcAhp() {
     }));
   }, [apiCrit, weights]);
 
-  // Si l'API ne renvoie pas les scores détaillés par parcelle dans data.chg, on mock des données pour le chart
+  // Utilisation des tops units renvoyés par le backend
   const barResultData = useMemo(() => {
-    if (amcResult?.chg && amcResult.chg.length > 0 && amcResult.chg[0].score) {
-      return amcResult.chg.slice(0, 10).map(p => ({
+    if (amcResult?.top_units && amcResult.top_units.length > 0) {
+      return amcResult.top_units.map(p => ({
         name: p.id,
         score: p.score,
-        cat: p.to
+        cat: p.cat
       }));
     }
-    // Mock data si l'API ne fournit pas les scores directement
-    return [
-      { name: 'TF-024', score: 78, cat: 'A' },
-      { name: 'TF-211', score: 71, cat: 'A' },
-      { name: 'TF-088', score: 54, cat: 'B' },
-      { name: 'TF-109', score: 48, cat: 'B' },
-      { name: 'TF-067', score: 31, cat: 'C' },
-    ];
+    return []; // Pas de fallback mock
   }, [amcResult]);
 
   return (
-    <>
-      <div className="p-6 overflow-y-auto h-full scroll-area space-y-5" style={{ height: 'calc(100vh - 160px)' }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>Modèle AMC/AHP</h1>
+    <div className="flex w-full h-full overflow-hidden bg-gray-50" style={{ height: 'calc(100vh - 160px)' }}>
+      {/* Left Panel: Workflow AMC */}
+      <div className="w-1/2 lg:w-[55%] shrink-0 flex flex-col bg-white border-r border-gray-200 z-10 shadow-sm relative overflow-y-auto scroll-area">
+        <div className="p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>Modèle AMC/AHP</h1>
             <p className="text-sm text-gray-500 mt-0.5">Analyse Multi-Critères par Processus Hiérarchique Analytique</p>
           </div>
           {simActive && (
@@ -169,65 +260,101 @@ export default function AmcAhp() {
 
         {step === 1 && (
           <Card className="p-5 relative z-10">
-            <SectionHeader title="Pondération par Comparaison par Paires (AHP)" sub="Attribuez des poids relatifs à chaque critère (somme = 1.00)" />
-            <div className="overflow-x-auto mb-4 mt-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Critère</th>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Poids (0–1)</th>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Visualisation</th>
-                    <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {apiCrit.map((crit, i) => (
-                    <tr key={crit.id} className="border-b border-gray-50">
-                      <td className="py-2.5 px-3 font-medium text-gray-800">{crit.label}</td>
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="number" step="0.01" min="0" max="1"
-                          value={weights[crit.id] || 0}
-                          onChange={e => setWeights(prev => ({ ...prev, [crit.id]: parseFloat(e.target.value) || 0 }))}
-                          className="w-24 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-[#1b7a45]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <div className="w-40 bg-gray-100 rounded-full h-2">
-                          <div className="h-2 rounded-full bg-[#1b7a45] transition-all" style={{ width: `${Math.min(100, (weights[crit.id] || 0) * 100)}%` }} />
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-gray-600">{((weights[crit.id] || 0) * 100).toFixed(0)}%</td>
-                    </tr>
-                  ))}
-                  <tr className="font-bold">
-                    <td className="py-2 px-3 text-gray-800">Total</td>
-                    <td className="py-2 px-3">
-                      <span className={totalWeight.toFixed(2) === '1.00' ? 'text-[#1b7a45]' : 'text-red-500'}>
-                        {totalWeight.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3" />
-                    <td className="py-2 px-3 text-right">{(totalWeight * 100).toFixed(0)}%</td>
-                  </tr>
-                </tbody>
-              </table>
+            <SectionHeader title="Pondération des Critères" sub="Définissez l'importance relative de chaque critère" />
+            
+            <div className="flex gap-2 my-4 bg-gray-100 p-1 rounded-lg w-max">
+               <button className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'ponderation' ? 'bg-white shadow-sm text-[#1b7a45]' : 'text-gray-600'}`} onClick={() => setMode('ponderation')}>
+                 Pondération Directe
+               </button>
+               <button className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'ahp' ? 'bg-white shadow-sm text-[#1b7a45]' : 'text-gray-600'}`} onClick={() => setMode('ahp')}>
+                 Matrice AHP (Saaty)
+               </button>
             </div>
 
-            {/* CR indicator */}
-            <div className={`flex items-start gap-2 p-3 rounded-xl ${crOk ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
-              {crOk ? <CheckCircle size={14} className="text-green-600 mt-0.5" /> : <AlertTriangle size={14} className="text-red-500 mt-0.5" />}
-              <div>
-                <p className={`text-sm font-semibold ${crOk ? 'text-green-800' : 'text-red-700'}`}>
-                  Ratio de Cohérence (CR) = {cr} — {crOk ? 'Cohérent (CR < 0.10 ✓)' : 'Incohérent (CR ≥ 0.10 — révisez les poids)'}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">Méthode Saaty : un CR &lt; 0.10 garantit la consistance de la matrice de comparaison.</p>
+            {mode === 'ponderation' ? (
+              <div className="overflow-x-auto mb-4 mt-4 animate-in fade-in">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Critère</th>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Poids (0–1)</th>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Visualisation</th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apiCrit.map((crit, i) => (
+                      <tr key={crit.id} className="border-b border-gray-50">
+                        <td className="py-2.5 px-3 font-medium text-gray-800">{crit.label}</td>
+                        <td className="py-2.5 px-3">
+                          <input
+                            type="number" step="0.01" min="0" max="1"
+                            value={weights[crit.id] || 0}
+                            onChange={e => setWeights(prev => ({ ...prev, [crit.id]: parseFloat(e.target.value) || 0 }))}
+                            className="w-24 border border-gray-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-[#1b7a45]"
+                          />
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="w-40 bg-gray-100 rounded-full h-2">
+                            <div className="h-2 rounded-full bg-[#1b7a45] transition-all" style={{ width: `${Math.min(100, (weights[crit.id] || 0) * 100)}%` }} />
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-gray-600">{((weights[crit.id] || 0) * 100).toFixed(0)}%</td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold">
+                      <td className="py-2 px-3 text-gray-800">Total</td>
+                      <td className="py-2 px-3">
+                        <span className={totalWeight.toFixed(2) === '1.00' ? 'text-[#1b7a45]' : 'text-red-500'}>
+                          {totalWeight.toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3" />
+                      <td className="py-2 px-3 text-right">{(totalWeight * 100).toFixed(0)}%</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
+            ) : (
+              <div className="mb-4 mt-4 animate-in fade-in space-y-4">
+                 <AhpMatrix criteria={apiCrit} matrix={ahpMatrix} onChange={setAhpMatrix} />
+                 
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {apiCrit.map((crit, i) => (
+                       <div key={crit.id} className="bg-gray-50 border border-gray-100 p-3 rounded-xl flex items-center justify-between">
+                         <span className="text-xs font-medium text-gray-600 line-clamp-1 flex-1">{crit.label}</span>
+                         <span className="text-sm font-bold text-[#1b7a45] ml-2">{((weights[crit.id] || 0) * 100).toFixed(1)}%</span>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+            )}
+
+            {/* CR indicator - only relevant for AHP or if total != 1 for direct */}
+            {mode === 'ahp' ? (
+              <div className={`flex items-start gap-2 p-3 rounded-xl ${crOk ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
+                {crOk ? <CheckCircle size={14} className="text-green-600 mt-0.5" /> : <AlertTriangle size={14} className="text-red-500 mt-0.5" />}
+                <div>
+                  <p className={`text-sm font-semibold ${crOk ? 'text-green-800' : 'text-red-700'}`}>
+                    Ratio de Cohérence (CR) = {cr} — {crOk ? 'Cohérent (CR < 0.10 ✓)' : 'Incohérent (CR ≥ 0.10 — révisez la matrice)'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">Méthode Saaty : un CR &lt; 0.10 garantit la consistance de la matrice de comparaison.</p>
+                </div>
+              </div>
+            ) : (
+              totalWeight.toFixed(2) !== '1.00' && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100 mt-4">
+                  <AlertTriangle size={14} className="text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">La somme des poids doit être égale à 1.00 (actuel : {totalWeight.toFixed(2)})</p>
+                  </div>
+                </div>
+              )
+            )}
 
             <div className="flex gap-3 mt-6">
               <Button variant="ghost" onClick={() => setStep(0)}>← Retour</Button>
-              <Button onClick={() => setStep(2)}>Suivant : Seuils CAR →</Button>
+              <Button onClick={() => setStep(2)} disabled={mode === 'ponderation' && totalWeight.toFixed(2) !== '1.00'}>Suivant : Seuils CAR →</Button>
             </div>
           </Card>
         )}
@@ -368,11 +495,14 @@ export default function AmcAhp() {
               </div>
             </Card>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Rendu de la carte derrière (MapSlot) */}
-      <div className="mapSlot opacity-40 pointer-events-none absolute inset-0 -z-10 mix-blend-multiply" ref={setMapContainer}></div>
-    </>
+      {/* Right Panel: Simulated Map */}
+      <div className="flex-1 relative h-full bg-[#e5e5e5]">
+        <div className="mapSlot w-full h-full absolute inset-0" ref={setMapContainer}></div>
+      </div>
+    </div>
   );
 }

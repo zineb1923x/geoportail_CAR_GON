@@ -1,6 +1,8 @@
+import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { Layers, TrendingUp, AlertTriangle, CheckCircle, Clock, ArrowRight, Download, RefreshCw } from 'lucide-react'
 import { Card, CARBadge, Badge, Button, DataTable, StatusDot, SectionHeader } from '../ui/ui'
+import { useApp } from '../../context/AppContext'
 
 const sparkA = [{ v: 1200 }, { v: 1380 }, { v: 1290 }, { v: 1400 }, { v: 1520 }, { v: 1610 }, { v: 1742 }]
 const sparkB = [{ v: 890 }, { v: 920 }, { v: 870 }, { v: 940 }, { v: 980 }, { v: 1010 }, { v: 983 }]
@@ -68,6 +70,38 @@ const communeStats = [
 ]
 
 export default function Dashboard() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const headers: any = {}
+      const t = localStorage.getItem('token')
+      if (t && t !== 'guest') headers['Authorization'] = `Bearer ${t}`
+      const res = await fetch('/api/classement/dashboard/', { headers })
+      if (res.ok) {
+        const json = await res.json()
+        setData(json)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  if (loading) {
+    return <div className="p-6 flex justify-center items-center h-full"><p>Chargement des statistiques...</p></div>
+  }
+
+  const kpi = data?.kpi || { surface_a: 0, surface_b: 0, surface_c: 0, surface_total: 0 }
+  const activity = data?.activity || []
+
   return (
     <div className="p-6 overflow-y-auto h-full scroll-area space-y-6">
       {/* Welcome bar */}
@@ -76,10 +110,10 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Tableau de bord — Classification Agricole Régionale
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Guelmim-Oued Noun · Lundi 18 août 2026 · Campagne 2025/2026</p>
+          <p className="text-sm text-gray-500 mt-0.5">Guelmim-Oued Noun · Région en temps réel</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" icon={<RefreshCw size={13} />}>Actualiser</Button>
+          <Button variant="outline" size="sm" icon={<RefreshCw size={13} />} onClick={fetchData}>Actualiser</Button>
           <Button variant="primary" size="sm" icon={<Download size={13} />}>Exporter</Button>
         </div>
       </div>
@@ -87,24 +121,24 @@ export default function Dashboard() {
       {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          label="Parcelles CAR-A" value="1 742" sub="terres agricoles excellentes"
+          label="Surface CAR-A" value={`${kpi.surface_a.toLocaleString('fr-FR')} ha`} sub="terres agricoles excellentes"
           color="#2e7d32" icon={<CheckCircle size={18} color="#4caf50" />}
-          spark={sparkA} sparkColor="#4caf50" trend="↑ +8.2% vs campagne précédente"
+          spark={sparkA} sparkColor="#4caf50" trend="Surface classée A"
         />
         <KPICard
-          label="Parcelles CAR-B" value="983" sub="terres agricoles bonnes"
+          label="Surface CAR-B" value={`${kpi.surface_b.toLocaleString('fr-FR')} ha`} sub="terres agricoles bonnes"
           color="#e65100" icon={<TrendingUp size={18} color="#ff9800" />}
-          spark={sparkB} sparkColor="#ff9800" trend="→ Stable (±1.4%)"
+          spark={sparkB} sparkColor="#ff9800" trend="Surface classée B"
         />
         <KPICard
-          label="Parcelles CAR-C" value="441" sub="terres à améliorer"
+          label="Surface CAR-C" value={`${kpi.surface_c.toLocaleString('fr-FR')} ha`} sub="terres à améliorer"
           color="#c62828" icon={<AlertTriangle size={18} color="#f44336" />}
-          spark={sparkC} sparkColor="#f44336" trend="↓ −13.1% après intervention"
+          spark={sparkC} sparkColor="#f44336" trend="Surface classée C"
         />
         <KPICard
-          label="Superficie Totale" value="24 680 ha" sub="surface instruite 2026"
+          label="Superficie Totale" value={`${kpi.surface_total.toLocaleString('fr-FR')} ha`} sub="surface classée totale"
           color="#1b7a45" icon={<Layers size={18} color="#1b7a45" />}
-          spark={sparkTotal} sparkColor="#1b7a45" trend="↑ +580 ha nouvelles parcelles"
+          spark={sparkTotal} sparkColor="#1b7a45" trend="Total AMC"
         />
       </div>
 
@@ -112,21 +146,19 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Activity timeline */}
         <Card className="lg:col-span-2 p-5">
-          <SectionHeader title="Activité récente" sub="Opérations des 24 dernières heures"
+          <SectionHeader title="Activité récente" sub="Opérations récentes sur la plateforme"
             action={<Button variant="ghost" size="sm" icon={<ArrowRight size={13} />}>Tout voir</Button>} />
           <div className="space-y-0">
-            {recentActivity.map((item, i) => (
+            {activity.length === 0 && <p className="text-gray-400 py-4 text-center">Aucune activité récente.</p>}
+            {activity.map((item: any, i: number) => (
               <div key={i} className="flex items-center gap-4 py-2.5 border-b border-gray-50 last:border-0">
                 <span className="text-xs text-gray-400 font-mono w-10 shrink-0">{item.time}</span>
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: item.cat === 'A' ? '#4caf50' : item.cat === 'B' ? '#ff9800' : '#f44336' }} />
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#2196f3' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 font-medium truncate">{item.type} — <span className="text-gray-500">{item.parcel}</span></p>
-                  <p className="text-xs text-gray-400">{item.user}</p>
+                  <p className="text-sm text-gray-900 font-medium truncate">{item.type} — <span className="text-gray-500">{item.module}</span></p>
+                  <p className="text-xs text-gray-400 truncate">{item.desc}</p>
                 </div>
-                <CARBadge cat={item.cat} />
-                <Badge color={item.status === 'Validé' || item.status === 'Terminé' || item.status === 'Localisé' ? 'green' : item.status === 'En cours' ? 'blue' : 'gold'}>
-                  {item.status}
-                </Badge>
+                <Badge color="blue">{item.user}</Badge>
               </div>
             ))}
           </div>

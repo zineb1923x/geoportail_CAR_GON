@@ -79,7 +79,7 @@ export default function ImportCouche({ onClose, onSuccess }) {
       formData.append('description', description);
       formData.append('source', source);
 
-      const res = await fetch('http://localhost:8000/api/referentiel/import/', {
+      const res = await fetch('/api/referentiel/import/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

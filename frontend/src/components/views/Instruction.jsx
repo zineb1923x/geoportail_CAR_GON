@@ -246,7 +246,7 @@ export default function Instruction() {
                 // Appel au backend
                 toast('Génération du PDF en cours...');
                 try {
-                  const res = await fetch(`http://localhost:8000/api/classement/unitecarteagricole/${pc.id.replace('UCA-', '')}/fiche_pdf/`);
+                  const res = await fetch(`/api/classement/unitecarteagricole/${pc.id.replace('UCA-', '')}/fiche_pdf/`);
                   if (res.ok) {
                     const blob = await res.blob();
                     const url = window.URL.createObjectURL(blob);

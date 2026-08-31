@@ -10,5 +10,11 @@ export default defineConfig({
   ],
   server: {
     historyApiFallback: true,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      },
+    },
   },
 })

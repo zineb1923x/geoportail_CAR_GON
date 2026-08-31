@@ -49,7 +49,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
 
   useEffect(() => {
     if (!isServer || !coucheId) return;
-    fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/`, { headers: headers() })
+    fetch(`/api/referentiel/couches/${coucheId}/`, { headers: headers() })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setDetail(data); })
       .catch(() => {});
@@ -58,7 +58,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
   useEffect(() => {
     if (tab !== 'history' || !isServer || !coucheId || versions !== null) return;
     setLoadingVersions(true);
-    fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/versions/`, { headers: headers() })
+    fetch(`/api/referentiel/couches/${coucheId}/versions/`, { headers: headers() })
       .then(r => r.ok ? r.json() : [])
       .then(data => setVersions(Array.isArray(data) ? data : []))
       .catch(() => setVersions([]))
@@ -68,7 +68,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
   useEffect(() => {
     if (tab !== 'meta' || !isServer || !coucheId || meta !== null) return;
     setLoadingMeta(true);
-    fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/metadonnees/`, { headers: headers() })
+    fetch(`/api/referentiel/couches/${coucheId}/metadonnees/`, { headers: headers() })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
@@ -83,7 +83,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
   useEffect(() => {
     if (tab !== 'champs' || !isServer || !coucheId || champs !== null) return;
     setLoadingChamps(true);
-    fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/champs/`, { headers: headers() })
+    fetch(`/api/referentiel/couches/${coucheId}/champs/`, { headers: headers() })
       .then(r => r.ok ? r.json() : [])
       .then(data => setChamps(Array.isArray(data) ? data : []))
       .catch(() => setChamps([]))
@@ -94,7 +94,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
     if (!coucheId) return;
     setSavingMeta(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/metadonnees/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/metadonnees/`, {
         method: 'PATCH',
         headers: headers(),
         body: JSON.stringify(metaForm),
@@ -119,7 +119,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
     if (!coucheId) return;
     setSavingInfo(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/`, {
         method: 'PATCH',
         headers: headers(),
         body: JSON.stringify(infoForm),
@@ -143,7 +143,7 @@ export default function CoucheDetailModal({ couche, isServer = false, initialTab
     if (!coucheId) return;
     setSavingChamps(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/champs/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/champs/`, {
         method: 'PATCH',
         headers: headers(),
         body: JSON.stringify(champsForm),

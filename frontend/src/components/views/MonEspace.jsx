@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { PARCELS } from '../../data/parcels';
 
 export default function MonEspace() {
-  const { store, setStore, go, toast, doExport, setSelectedParcel } = useApp();
+  const { store, setStore, go, toast, doExport, setSelectedParcel, user } = useApp();
 
   const delModel = (k, i) => {
     setStore(prev => {
@@ -21,14 +21,17 @@ export default function MonEspace() {
     return store.parcels.map(id => PARCELS.find(p => p.id === id)).filter(Boolean);
   }, [store.parcels]);
 
+  const fullName = user?.first_name || user?.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : user?.username || 'Utilisateur';
+  const roleName = user?.role === 'admin' ? 'Administrateur' : user?.role === 'editeur' ? 'Agent Instructeur' : user?.role === 'decideur' ? 'Décideur' : 'Consultant';
+
   return (
     <div className="p-6 overflow-y-auto h-full scroll-area space-y-6" style={{ height: 'calc(100vh - 160px)' }}>
       {/* Welcome */}
       <div className="bg-gradient-to-r from-[#0b3d23] to-[#1b7a45] rounded-xl p-5 flex items-center justify-between">
         <div>
           <p className="text-green-300 text-xs font-medium mb-1">Mon Espace de Travail</p>
-          <h1 className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Ahmed Benali</h1>
-          <p className="text-green-300 text-sm mt-0.5">Agent Instructeur · DRA Guelmim-Oued Noun</p>
+          <h1 className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{fullName}</h1>
+          <p className="text-green-300 text-sm mt-0.5">{roleName} · DRA Guelmim-Oued Noun</p>
         </div>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div className="bg-white/10 rounded-xl px-4 py-3">

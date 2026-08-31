@@ -25,6 +25,7 @@ export function AppProvider({ children }) {
   const [toastMsg, setToastMsg] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef(null);
+  const [amcResult, setAmcResult] = useState(null);
   const [store, setStore] = useState({
     queries: [
       { name: "Terres B collectives à moins de 500 m d'un point d'eau", crit: { cat: 'B', stat: 'Collectif', eau: '500', urb: '' }, out: '1 entité · 128,4 ha', date: '28/07/2026', auteur: 'f.amrani' },
@@ -50,7 +51,7 @@ export function AppProvider({ children }) {
     const headers = {};
     if (t && t !== 'guest') headers['Authorization'] = `Bearer ${t}`;
 
-    fetch('http://localhost:8000/api/referentiel/couches/', { headers })
+    fetch('/api/referentiel/couches/', { headers })
       .then(res => res.ok ? res.json() : [])
       .then(data => setServerCouches(Array.isArray(data) ? data : (data.results || [])))
       .catch(() => {});
@@ -112,7 +113,7 @@ export function AppProvider({ children }) {
 
   const login = async (username, password) => {
     try {
-      const res = await fetch('http://localhost:8000/api/auth/login/', {
+      const res = await fetch('/api/auth/login/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -145,7 +146,7 @@ export function AppProvider({ children }) {
       return;
     }
     try {
-      const res = await fetch('http://localhost:8000/api/auth/me/', {
+      const res = await fetch('/api/auth/me/', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       if (res.ok) {
@@ -182,6 +183,7 @@ export function AppProvider({ children }) {
     setNavigate,
     selectedParcel, setSelectedParcel,
     simActive, setSimActive,
+    amcResult, setAmcResult,
     toastMsg, toastVisible, toast,
     doExport,
     store, setStore,

@@ -71,7 +71,8 @@ export default function MapPanel() {
   const { 
     selectedParcel, setSelectedParcel, simActive, go, followParcel,
     serverCouches, token, localizedFeature,
-    layerVis, subVis, catVis, carOpacity, setLayerVis, setSubVis, setCatVis, setCarOpacity
+    layerVis, subVis, catVis, carOpacity, setLayerVis, setSubVis, setCatVis, setCarOpacity,
+    amcResult
   } = useApp();
 
   const [parcCardVisible, setParcCardVisible] = useState(false);
@@ -129,6 +130,9 @@ export default function MapPanel() {
     return false;
   };
 
+  // Track which layers are already loading or loaded to avoid duplicate requests
+  const fetchingLayersRef = useRef(new Set());
+
   // Load GeoJSON for visible layers
   useEffect(() => {
     if (!serverCouches || serverCouches.length === 0) return;
@@ -137,22 +141,27 @@ export default function MapPanel() {
     const activeLayers = validCouches.filter(isLayerVisible);
     
     activeLayers.forEach(c => {
-      if (!geoJsonData[c.id]) {
+      if (!fetchingLayersRef.current.has(c.id)) {
+        fetchingLayersRef.current.add(c.id);
+        
         const t = token || localStorage.getItem('token');
         const headers = {};
         if (t && t !== 'guest') headers['Authorization'] = `Bearer ${t}`;
 
-        fetch(`http://localhost:8000/api/referentiel/couches/${c.id}/geojson/`, { headers })
+        fetch(`/api/referentiel/couches/${c.id}/geojson/`, { headers })
           .then(res => res.ok ? res.json() : null)
           .then(data => {
             if (data && data.features) {
               setGeoJsonData(prev => ({ ...prev, [c.id]: data }));
+            } else {
+              // If failed or empty, we might want to let it try again later, 
+              // but for now we keep it in the set to avoid spamming the backend
             }
           })
           .catch(() => {});
       }
     });
-  }, [serverCouches, layerVis, subVis, token, geoJsonData]);
+  }, [serverCouches, layerVis, subVis, token]);
 
   const selectParcel = (pc) => {
     setSelectedParcel(pc);
@@ -285,12 +294,25 @@ export default function MapPanel() {
                 const OCSCOL = { 'Cultures annuelles': '#cddc39', 'Arboriculture': '#8bc34a', 'Parcours': '#d7ccc8', 'Nu': '#eeeeee' };
                 if (OCSCOL[feature.properties.occ]) return { ...baseStyle, fillColor: OCSCOL[feature.properties.occ], color: '#fff', weight: 1 };
               }
+              
+              if (simActive && amcResult && amcResult.chg && th.includes('car')) {
+                const featureId = feature.properties.code_unite || feature.properties.CODE_UNITE || feature.properties.id || feature.properties.orig_id || feature.properties.OBJECTID;
+                const change = amcResult.chg.find(c => String(c.id) === String(featureId));
+                if (change) {
+                  let newColor = '#fdd835'; // default C
+                  if (change.to === 'A') newColor = '#2e7d32';
+                  if (change.to === 'B') newColor = '#8bc34a';
+                  
+                  return { ...baseStyle, fillColor: newColor, color: newColor, weight: 3, dashArray: '4,4', fillOpacity: Math.max(0.6, carOpacity) };
+                }
+              }
+              
               return baseStyle;
             };
 
             return (
               <GeoJSON 
-                key={c.id} 
+                key={`${c.id}-${simActive ? 'sim' : 'base'}`} 
                 data={geojson} 
                 style={styleFunc}
                 onEachFeature={(feature, layer) => {
@@ -361,7 +383,7 @@ export default function MapPanel() {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
             <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#0b3d23', margin: 0, flex: 1, fontFamily: 'Outfit, sans-serif' }}>
-              {selectedParcel.id || selectedParcel.orig_id || selectedParcel.OBJECTID || 'Entité'}
+              {selectedParcel.code_unite || selectedParcel.CODE_UNITE || selectedParcel.id || selectedParcel.orig_id || selectedParcel.OBJECTID || 'Entité'}
             </h4>
             {selectedParcel.cat && (
               <span

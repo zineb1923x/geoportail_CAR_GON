@@ -28,7 +28,7 @@ export default function Catalogue() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/valider/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/valider/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export default function Catalogue() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/soumettre/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/soumettre/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ export default function Catalogue() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/rejeter/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/rejeter/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export default function Catalogue() {
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/referentiel/couches/${coucheId}/`, {
+      const res = await fetch(`/api/referentiel/couches/${coucheId}/`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -213,8 +213,17 @@ export default function Catalogue() {
         <div className="space-y-4">
           {Object.entries(
             filtered.reduce((acc, layer) => {
-              const dom = layer.raw?.domaine || layer.raw?.[1]?.split(' — ')[0] || 'Général';
-              const sdom = layer.raw?.sous_domaine || layer.raw?.[1]?.split(' — ')[1] || 'Autres';
+              const isPending = layer.statut === 'brouillon' || layer.statut === 'soumise';
+              let dom, sdom;
+              
+              if (isPending) {
+                dom = '⚠️ EN ATTENTE DE TRAITEMENT';
+                sdom = layer.statut === 'soumise' ? 'Soumises à validation' : 'Brouillons';
+              } else {
+                dom = layer.raw?.domaine || layer.raw?.[1]?.split(' — ')[0] || 'Général';
+                sdom = layer.raw?.sous_domaine || layer.raw?.[1]?.split(' — ')[1] || 'Autres';
+              }
+              
               if (!acc[dom]) acc[dom] = {};
               if (!acc[dom][sdom]) acc[dom][sdom] = [];
               acc[dom][sdom].push(layer);

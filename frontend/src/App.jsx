@@ -88,13 +88,19 @@ function AppShell() {
     }
   }, [location.pathname]);
 
+  const isInitialMount = useRef(true);
+
   // Sync currentView → URL when view changes internally
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const expectedPath = VIEW_PATHS[currentView];
     if (expectedPath && location.pathname !== expectedPath) {
       navigate(expectedPath);
     }
-  }, [currentView]);
+  }, [currentView]); // Dépendance uniquement sur currentView !
 
   const hasMap = ['carte', 'loc', 'instr', 'req', 'amc'].includes(currentView);
 

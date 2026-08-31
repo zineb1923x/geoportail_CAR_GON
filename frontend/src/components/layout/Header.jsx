@@ -26,7 +26,7 @@ export default function Header() {
       return;
     }
     const delayDebounceFn = setTimeout(() => {
-      fetch(`http://localhost:8000/api/referentiel/recherche-globale/?q=${encodeURIComponent(q)}`)
+      fetch(`/api/referentiel/recherche-globale/?q=${encodeURIComponent(q)}`)
         .then(res => res.json())
         .then(data => {
           setResults(data.map(hit => {

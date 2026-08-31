@@ -38,7 +38,7 @@ export default function Administration() {
 
   const loadUsers = useCallback(() => {
     if (token) {
-      fetch('http://localhost:8000/api/users/users/', {
+      fetch('/api/users/users/', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then(res => res.ok ? res.json() : [])
@@ -49,7 +49,7 @@ export default function Administration() {
 
   const loadAuditLogs = useCallback(() => {
     if (token) {
-      fetch('http://localhost:8000/api/audit/auditlog/', {
+      fetch('/api/audit/auditlog/', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then(res => res.ok ? res.json() : [])
@@ -67,7 +67,7 @@ export default function Administration() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:8000/api/users/users/', {
+      const res = await fetch('/api/users/users/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

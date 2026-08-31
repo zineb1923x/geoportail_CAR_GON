@@ -44,7 +44,7 @@ export default function Requetes() {
       const headers = { 'Content-Type': 'application/json' };
       if (t && t !== 'guest') headers['Authorization'] = `Bearer ${t}`;
 
-      const res = await fetch('http://localhost:8000/api/classement/unitecarteagricole/requetes/', {
+      const res = await fetch('/api/classement/unitecarteagricole/requetes/', {
         method: 'POST',
         headers,
         body: JSON.stringify({ criteria: critToUse })
